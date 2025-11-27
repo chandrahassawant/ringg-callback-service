@@ -1,10 +1,13 @@
-// D:\Ring AI\src\routes\callback.route.js
 const express = require("express");
 const router = express.Router();
 
 const { triggerCallback } = require("../controllers/callback.controller");
+const { handleRinggWebhook } = require("../controllers/ringgWebhook.controller");
 
-// URL: GET /ringg-callback?phone=...&name=...
+// Existing
 router.get("/ringg-callback", triggerCallback);
+
+// NEW: Ringg webhook listener
+router.post("/ringg-webhook", handleRinggWebhook);
 
 module.exports = router;
