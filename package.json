@@ -1,0 +1,23 @@
+{
+  "name": "ring-ai",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "author": "",
+  "license": "ISC",
+
+  "scripts": {
+    "start": "node src/server.js",
+    "ringg:meta": "node src/tools/getRinggMeta.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+     "ringg:numbers": "node src/tools/getNumbers.js"
+    
+  },
+
+  "dependencies": {
+    "axios": "^1.13.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0"
+  }
+}
