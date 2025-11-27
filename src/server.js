@@ -19,6 +19,11 @@ app.use("/", callbackRoute);
 
 const PORT = process.env.PORT || 3000;
 
+app.get("/healthz", (req, res) => {
+  res.send("ok");
+});
+
+
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
