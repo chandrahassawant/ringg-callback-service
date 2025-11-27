@@ -1,54 +1,76 @@
 const axios = require("axios");
 
+// In-memory store to avoid duplicate calls in a short time window
+// NOTE: This resets when the server restarts, but is fine for now
+const lastCallByNumber = {};
+const COOLDOWN_MS = 60 * 1000; // 1 minute (adjust if needed)
+
 exports.triggerCallback = async (req, res) => {
   try {
-    const phone = req.query.phone;
-    const name = req.query.name || "Customer";
+    const { phone, name } = req.query;
 
     if (!phone) {
-      return res.status(400).send("❌ Phone number missing");
+      return res.status(400).json({ error: "phone is required" });
     }
 
     const formattedPhone = phone.startsWith("+") ? phone : `+${phone}`;
+    const callerName = name || "Customer";
 
-    const payload = {
-      name: name,
+    const now = Date.now();
+    const last = lastCallByNumber[formattedPhone];
+
+    // 🔒 If we recently triggered a call for this number, skip it
+    if (last && now - last < COOLDOWN_MS) {
+      console.log(
+        `⏱ Skipping duplicate call for ${formattedPhone} (cooldown active)`
+      );
+      return res.status(200).json({
+        status: "duplicate_ignored",
+        message: "Call already triggered recently. Please wait a moment."
+      });
+    }
+
+    // Save timestamp BEFORE calling Ringg (to avoid race conditions)
+    lastCallByNumber[formattedPhone] = now;
+
+    const payloadRingg = {
+      name: callerName,
       mobile_number: formattedPhone,
       agent_id: process.env.RINGG_AGENT_ID,
       from_number_id: process.env.RINGG_FROM_NUMBER_ID,
       custom_args_values: {
-        callee_name: name,
+        callee_name: callerName,
         mobile_number: formattedPhone
       }
     };
 
-    await axios.post(process.env.RINGG_OUTBOUND_URL, payload, {
-      headers: {
-        "X-API-KEY": process.env.RINGG_API_KEY,
-        "Content-Type": "application/json"
-      }
-    });
+    console.log("📞 Triggering Ringg outbound call:", payloadRingg);
 
-    return res.send(`
-      <!DOCTYPE html>
-      <html>
-        <head><meta charset="utf-8"><title>Call Scheduled</title></head>
-        <body style="font-family: Arial; text-align:center; margin-top:60px;">
-          <h2>✅ Thank you!</h2>
-          <p>Our AI assistant will call you shortly on:</p>
-          <h3>${formattedPhone}</h3>
-        </body>
-      </html>
-    `);
-  } catch (error) {
-    console.error(
-      "Error triggering Ringg AI call:",
-      error.response?.data || error.message
+    const response = await axios.post(
+      process.env.RINGG_OUTBOUND_URL,
+      payloadRingg,
+      {
+        headers: {
+          "X-API-KEY": process.env.RINGG_API_KEY,
+          "Content-Type": "application/json"
+        }
+      }
     );
 
-    return res.status(500).send(`
-      <h2>⚠️ Something went wrong</h2>
-      <pre>${JSON.stringify(error.response?.data || {}, null, 2)}</pre>
-    `);
+    console.log("✅ Ringg response:", response.data);
+
+    return res.status(200).json({
+      status: "call_triggered",
+      ringg_response: response.data
+    });
+  } catch (err) {
+    console.error(
+      "❌ Error triggering Ringg AI call:",
+      err.response?.data || err.message
+    );
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to trigger call"
+    });
   }
 };
